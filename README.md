@@ -68,8 +68,8 @@ Example response:
 
 ```json
 {
-  "short_url": "http://localhost:8080/1",
-  "code": "1",
+  "short_url": "http://localhost:8080/kP7x2QaM",
+  "code": "kP7x2QaM",
   "long_url": "https://example.com"
 }
 ```
@@ -79,7 +79,7 @@ Example response:
 Open the returned short URL, or request it directly:
 
 ```bash
-curl -i http://localhost:8080/1
+curl -i http://localhost:8080/kP7x2QaM
 ```
 
 The API responds with a `302 Found` redirect to the original URL.
@@ -87,7 +87,7 @@ The API responds with a `302 Found` redirect to the original URL.
 ### Get statistics
 
 ```bash
-curl http://localhost:8080/api/stats/1
+curl http://localhost:8080/api/stats/kP7x2QaM
 ```
 
 Short links are stored in PostgreSQL, so they remain available after the API process is stopped and restarted.

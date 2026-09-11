@@ -74,6 +74,9 @@ type shortenResponse struct {
 	LongURL  string `json:"long_url"`
 }
 
+const shortCodeLength = 8
+const maxCodeAttempts = 5
+
 // handle shorten request
 func (s *Server) handleShorten(w http.ResponseWriter, r *http.Request) {
 	var req shortenRequest
@@ -88,17 +91,27 @@ func (s *Server) handleShorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := s.store.NextID()
+	var code string
+	var rec *store.URLRecord
+	for attempt := 0; attempt < maxCodeAttempts; attempt++ {
+		code, err = shortcode.RandomBase62(shortCodeLength)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to generate short code")
+			return
+		}
 
-	code := shortcode.EncodeBase62(id)
+		rec = &store.URLRecord{
+			Code:      code,
+			LongURL:   longURL,
+			CreatedAt: time.Now(),
+		}
 
-	rec := &store.URLRecord{
-		Code:      code,
-		LongURL:   longURL,
-		CreatedAt: time.Now(),
+		err = s.store.Save(rec)
+		if !errors.Is(err, store.ErrCodeConflict) {
+			break
+		}
 	}
-
-	if err := s.store.Save(rec); err != nil {
+	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to save URL record")
 		return
 	}

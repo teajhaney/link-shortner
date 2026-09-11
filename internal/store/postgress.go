@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -41,6 +42,10 @@ func (p *Postgres) Save(rec *URLRecord) error {
 		 VALUES ($1, $2, $3, $4)`,
 		rec.Code, rec.LongURL, rec.CreatedAt, rec.Clicks,
 	)
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return ErrCodeConflict
+	}
 	return err
 }
 
