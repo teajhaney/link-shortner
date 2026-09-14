@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
+	"link-shortner/internal/database"
 	"link-shortner/internal/link"
 	"link-shortner/internal/server"
-	"link-shortner/internal/store"
 	"log"
 	"net/http"
 	"os"
@@ -22,7 +22,7 @@ func main() {
 		log.Fatal("DATABASE_URL is not set; export it before starting the API")
 	}
 
-	pg, err := store.NewPostgres(context.Background(), dsn)
+	pg, err := database.NewPostgres(context.Background(), dsn)
 	if err != nil {
 		log.Fatalf("connecting to postgres: %v", err)
 	}
@@ -32,8 +32,13 @@ func main() {
 	linkService := link.NewService("http://localhost:8080", pg)
 	linkHandler := link.NewHandler(linkService)
 
+	//routes
+	router := server.New(
+		linkHandler,
+	)
+
 	log.Println("listening on :8080")
-	if err := http.ListenAndServe(":8080", server.New(linkHandler)); err != nil {
+	if err := http.ListenAndServe(":8080", router); err != nil {
 		log.Fatal(err)
 	}
 }

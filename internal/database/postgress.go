@@ -1,4 +1,4 @@
-package store
+package database
 
 import (
 	"context"
@@ -28,4 +28,3 @@ func NewPostgres(ctx context.Context, dsn string) (*Postgres, error) {
 func (p *Postgres) Close() {
 	p.pool.Close()
 }
-

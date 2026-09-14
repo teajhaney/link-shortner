@@ -3,8 +3,8 @@ package link
 import (
 	"errors"
 	"fmt"
+	"link-shortner/internal/database"
 	"link-shortner/internal/shortcode"
-	"link-shortner/internal/store"
 	"net/url"
 	"strings"
 	"time"
@@ -21,8 +21,8 @@ const (
 )
 
 type Service struct {
-	baseURL string
-	store   store.Store
+	baseURL  string
+	database database.Link
 }
 
 type ShortenResult struct {
@@ -31,8 +31,8 @@ type ShortenResult struct {
 	LongURL  string
 }
 
-func NewService(baseURL string, storage store.Store) *Service {
-	return &Service{baseURL: baseURL, store: storage}
+func NewService(baseURL string, storage database.Link) *Service {
+	return &Service{baseURL: baseURL, database: storage}
 }
 
 func (s *Service) Shorten(rawURL string) (*ShortenResult, error) {
@@ -48,8 +48,8 @@ func (s *Service) Shorten(rawURL string) (*ShortenResult, error) {
 			return nil, err
 		}
 
-		record := &store.URLRecord{Code: code, LongURL: longURL, CreatedAt: time.Now()}
-		if err = s.store.Save(record); !errors.Is(err, store.ErrCodeConflict) {
+		record := &database.URLRecord{Code: code, LongURL: longURL, CreatedAt: time.Now()}
+		if err = s.database.Save(record); !errors.Is(err, database.ErrCodeConflict) {
 			break
 		}
 	}
@@ -64,17 +64,17 @@ func (s *Service) Shorten(rawURL string) (*ShortenResult, error) {
 	}, nil
 }
 
-func (s *Service) Resolve(code string) (*store.URLRecord, error) {
-	record, err := s.store.Get(code)
+func (s *Service) Resolve(code string) (*database.URLRecord, error) {
+	record, err := s.database.Get(code)
 	if err != nil {
 		return nil, err
 	}
-	_ = s.store.IncrementClicks(code)
+	_ = s.database.IncrementClicks(code)
 	return record, nil
 }
 
-func (s *Service) Stats(code string) (*store.URLRecord, error) {
-	return s.store.Get(code)
+func (s *Service) Stats(code string) (*database.URLRecord, error) {
+	return s.database.Get(code)
 }
 
 func normalizeURL(raw string) (string, error) {

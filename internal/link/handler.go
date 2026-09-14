@@ -3,7 +3,7 @@ package link
 import (
 	"encoding/json"
 	"errors"
-	"link-shortner/internal/store"
+	"link-shortner/internal/database"
 	"net/http"
 )
 
@@ -64,7 +64,7 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 
 	rec, err := h.service.Resolve(code)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, database.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "short link not found")
 			return
 		}
@@ -80,7 +80,7 @@ func (h *Handler) HandleStats(w http.ResponseWriter, r *http.Request) {
 
 	rec, err := h.service.Stats(code)
 	if err != nil {
-		if errors.Is(err, store.ErrNotFound) {
+		if errors.Is(err, database.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "short link not found")
 			return
 		}
