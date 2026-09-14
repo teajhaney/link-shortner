@@ -30,7 +30,7 @@ func (p *Postgres) GetUserByEmail(email string) (*UserRecord, error) {
 	err := p.pool.QueryRow(ctx, `SELECT id, name, email, password_hash, created_at, updated_at FROM users WHERE email = $1`, email).Scan(&rec.ID, &rec.Name, &rec.Email, &rec.PasswordHash, &rec.CreatedAt, &rec.UpdatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, ErrUserNotFound
 	}
 	if err != nil {
 		return nil, err
@@ -46,7 +46,7 @@ func (p *Postgres) GetUserByID(id string) (*UserRecord, error) {
 	err := p.pool.QueryRow(ctx, `SELECT id, name, email, password_hash, created_at, updated_at FROM users WHERE id = $1`, id).Scan(&rec.ID, &rec.Name, &rec.Email, &rec.PasswordHash, &rec.CreatedAt, &rec.UpdatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, ErrNotFound
+		return nil, ErrUserNotFound
 	}
 	if err != nil {
 		return nil, err

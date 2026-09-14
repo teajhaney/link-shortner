@@ -9,6 +9,7 @@ var (
 	ErrNotFound      = errors.New("short code not found")
 	ErrCodeConflict  = errors.New("short code already exists")
 	ErrEmailConflict = errors.New("email already exists")
+	ErrUserNotFound  = errors.New("user not found")
 )
 
 // records for everything tracked by the system for a given shortlinked
