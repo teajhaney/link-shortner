@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"link-shortner/internal/handler"
+	"link-shortner/internal/link"
+	"link-shortner/internal/server"
 	"link-shortner/internal/store"
 	"log"
 	"net/http"
@@ -27,11 +28,12 @@ func main() {
 	}
 	defer pg.Close()
 
-	log.Println("using postgres store")
-	srv := handler.NewServer("http://localhost:8080", pg)
+	log.Println("Using postgres store")
+	linkService := link.NewService("http://localhost:8080", pg)
+	linkHandler := link.NewHandler(linkService)
 
 	log.Println("listening on :8080")
-	if err := http.ListenAndServe(":8080", srv.Routes()); err != nil {
+	if err := http.ListenAndServe(":8080", server.New(linkHandler)); err != nil {
 		log.Fatal(err)
 	}
 }

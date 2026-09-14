@@ -3,7 +3,6 @@ package shortcode
 import (
 	"crypto/rand"
 	"errors"
-
 )
 
 const base62Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
@@ -16,14 +15,17 @@ func RandomBase62(length int) (string, error) {
 
 	code := make([]byte, length)
 	buffer := make([]byte, length)
+
 	for filled := 0; filled < length; {
 		if _, err := rand.Read(buffer); err != nil {
 			return "", err
 		}
+
 		for _, value := range buffer {
 			if value >= 248 {
 				continue
 			}
+
 			code[filled] = base62Alphabet[int(value)%len(base62Alphabet)]
 			filled++
 			if filled == length {
@@ -34,4 +36,3 @@ func RandomBase62(length int) (string, error) {
 
 	return string(code), nil
 }
-

@@ -2,7 +2,6 @@ package store
 
 import (
 	"errors"
-	"sync"
 	"time"
 )
 
@@ -26,14 +25,13 @@ type Store interface {
 	Save(rec *URLRecord) error
 	Get(code string) (*URLRecord, error)
 	IncrementClicks(code string) error
-	NextID() uint64
 }
 
 // Memory is a concurrency-safe, in-memory Store.
 // Data is lost on restart -- fine for learning, swap out for
 // a real database when you want persistence.
-type Memory struct {
-	mu      sync.RWMutex
-	records map[string]*URLRecord
-	counter uint64
-}
+// type Memory struct {
+// 	mu      sync.RWMutex
+// 	records map[string]*URLRecord
+// 	counter uint64
+// }
