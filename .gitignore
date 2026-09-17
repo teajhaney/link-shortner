@@ -1,3 +1,7 @@
 .env
 tmp/
 
+# Compiled binaries. Air builds into tmp/main; "/api" is anchored to the repo
+# root so it never matches the cmd/api package directory.
+/api
+
