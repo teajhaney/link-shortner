@@ -39,10 +39,19 @@ type UserRecord struct {
 	UpdatedAt    time.Time
 }
 
+type UserUpdate struct {
+	Name         *string
+	Email        *string
+	PasswordHash *string
+	UpdatedAt    time.Time
+}
+
 // user Store
 type Users interface {
 	CreateUser(rec *UserRecord) error
 	GetUserByEmail(email string) (*UserRecord, error)
 	GetUserByID(id string) (*UserRecord, error)
 	GetAllUsers() ([]UserRecord, error)
+	UpdateUser(id string, update UserUpdate) (*UserRecord, error)
+	DeleteUser(id string) error
 }
