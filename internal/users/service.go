@@ -12,8 +12,8 @@ var (
 	ErrInvalidEmail     = auth.ErrInvalidEmail
 	ErrPasswordTooShort = auth.ErrPasswordTooShort
 	ErrPasswordTooLong  = auth.ErrPasswordTooLong
-	ErrInvalidID         = auth.ErrInvalidID
-	ErrUserNotFound      = auth.ErrUserNotFound
+	ErrInvalidID        = auth.ErrInvalidID
+	ErrUserNotFound     = auth.ErrUserNotFound
 )
 
 type service struct {
@@ -85,4 +85,24 @@ func (s *service) GetUserByID(id string) (*UserResult, error) {
 		CreatedAt: rec.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: rec.UpdatedAt.Format(time.RFC3339),
 	}, nil
+}
+
+func (s *service) GetAllUsers() ([]*UserResult, error) {
+	recs, err := s.database.GetAllUsers()
+	if err != nil {
+		return nil, err
+	}
+
+	var results []*UserResult
+	for _, rec := range recs {
+		results = append(results, &UserResult{
+			ID:        rec.ID,
+			Name:      rec.Name,
+			Email:     rec.Email,
+			CreatedAt: rec.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: rec.UpdatedAt.Format(time.RFC3339),
+		})
+	}
+
+	return results, nil
 }

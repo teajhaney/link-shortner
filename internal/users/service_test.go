@@ -20,6 +20,8 @@ func (s *fakeStore) GetUserByEmail(string) (*database.UserRecord, error) { retur
 
 func (s *fakeStore) GetUserByID(string) (*database.UserRecord, error) { return nil, nil }
 
+func (s *fakeStore) GetAllUsers() ([]database.UserRecord, error) { return nil, nil }
+
 func TestCreateUserValidation(t *testing.T) {
 	tests := []struct {
 		name     string

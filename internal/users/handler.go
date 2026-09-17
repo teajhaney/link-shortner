@@ -33,6 +33,12 @@ type userResponse struct {
 	Data    UserResult `json:"data"`
 }
 
+type usersResponse struct {
+	Code    int           `json:"code"`
+	Message string        `json:"message"`
+	Data    []*UserResult `json:"data"`
+}
+
 func (h *Handler) HandleSignup(w http.ResponseWriter, r *http.Request) {
 	var req signupRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -100,5 +106,19 @@ func (h *Handler) HandleGetUserByID(w http.ResponseWriter, r *http.Request) {
 		Code:    http.StatusOK,
 		Message: "User retrieved successfully",
 		Data:    *user,
+	})
+}
+
+func (h *Handler) HandleGetAllUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.service.GetAllUsers()
+	if err != nil {
+		response.WriteError(w, http.StatusInternalServerError, "Failed to retrieve users")
+		return
+	}
+
+	response.WriteJSON(w, http.StatusOK, usersResponse{
+		Code:    http.StatusOK,
+		Message: "Users retrieved successfully",
+		Data:    users,
 	})
 }

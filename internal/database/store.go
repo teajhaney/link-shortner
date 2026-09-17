@@ -44,4 +44,5 @@ type Users interface {
 	CreateUser(rec *UserRecord) error
 	GetUserByEmail(email string) (*UserRecord, error)
 	GetUserByID(id string) (*UserRecord, error)
+	GetAllUsers() ([]UserRecord, error)
 }

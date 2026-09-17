@@ -43,7 +43,7 @@ func (p *Postgres) GetUserByID(id string) (*UserRecord, error) {
 	ctx := context.Background()
 
 	var rec UserRecord
-	err := p.pool.QueryRow(ctx, `SELECT id, name, email, password_hash, created_at, updated_at FROM users WHERE id = $1`, id).Scan(&rec.ID, &rec.Name, &rec.Email, &rec.PasswordHash, &rec.CreatedAt, &rec.UpdatedAt)
+	err := p.pool.QueryRow(ctx, `SELECT id, name, email, created_at, updated_at FROM users WHERE id = $1`, id).Scan(&rec.ID, &rec.Name, &rec.Email, &rec.CreatedAt, &rec.UpdatedAt)
 
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrUserNotFound
@@ -52,4 +52,29 @@ func (p *Postgres) GetUserByID(id string) (*UserRecord, error) {
 		return nil, err
 	}
 	return &rec, nil
+}
+
+// GetAllUsers returns all users ordered by creation time.
+func (p *Postgres) GetAllUsers() ([]UserRecord, error) {
+	ctx := context.Background()
+
+	var recs []UserRecord
+	rows, err := p.pool.Query(ctx, `SELECT id, name, email, created_at, updated_at FROM users ORDER BY created_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var rec UserRecord
+		if err := rows.Scan(&rec.ID, &rec.Name, &rec.Email, &rec.CreatedAt, &rec.UpdatedAt); err != nil {
+			return nil, err
+		}
+		recs = append(recs, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return recs, nil
 }
