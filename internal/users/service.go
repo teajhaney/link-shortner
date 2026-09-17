@@ -16,7 +16,7 @@ var (
 	ErrNoUpdateFields   = auth.ErrNoUpdateFields
 )
 
-type service struct {
+type Service struct {
 	database database.Users
 }
 
@@ -30,11 +30,11 @@ type UserResult struct {
 	UpdatedAt string
 }
 
-func NewService(storage database.Users) *service {
-	return &service{database: storage}
+func NewService(storage database.Users) *Service {
+	return &Service{database: storage}
 }
 
-func (s *service) CreateUser(name, email, password string) error {
+func (s *Service) CreateUser(name, email, password string) error {
 	input, err := auth.ValidateSignupInput(name, email, password)
 	if err != nil {
 		return err
@@ -57,7 +57,7 @@ func (s *service) CreateUser(name, email, password string) error {
 	return s.database.CreateUser(rec)
 }
 
-func (s *service) GetUserByEmail(email string) (*UserResult, error) {
+func (s *Service) GetUserByEmail(email string) (*UserResult, error) {
 	// Normalizing here keeps lookups consistent with the email stored on
 	// signup, which is lowercased and trimmed.
 	email, err := auth.ValidateEmail(email)
@@ -79,7 +79,7 @@ func (s *service) GetUserByEmail(email string) (*UserResult, error) {
 	}, nil
 }
 
-func (s *service) GetUserByID(id string) (*UserResult, error) {
+func (s *Service) GetUserByID(id string) (*UserResult, error) {
 	// Validating the ID here avoids sending malformed UUIDs to Postgres, where
 	// they would surface as an internal error instead of a bad request.
 	id, err := auth.ValidateUserID(id)
@@ -95,7 +95,7 @@ func (s *service) GetUserByID(id string) (*UserResult, error) {
 	return toUserResult(rec), nil
 }
 
-func (s *service) GetAllUsers() ([]*UserResult, error) {
+func (s *Service) GetAllUsers() ([]*UserResult, error) {
 	recs, err := s.database.GetAllUsers()
 	if err != nil {
 		return nil, err
@@ -115,7 +115,7 @@ func (s *service) GetAllUsers() ([]*UserResult, error) {
 	return results, nil
 }
 
-func (s *service) UpdateUser(id string, name, email, password *string) (*UserResult, error) {
+func (s *Service) UpdateUser(id string, name, email, password *string) (*UserResult, error) {
 	id, err := auth.ValidateUserID(id)
 	if err != nil {
 		return nil, err
@@ -157,7 +157,7 @@ func (s *service) UpdateUser(id string, name, email, password *string) (*UserRes
 	return toUserResult(rec), nil
 }
 
-func (s *service) DeleteUser(id string) error {
+func (s *Service) DeleteUser(id string) error {
 	id, err := auth.ValidateUserID(id)
 	if err != nil {
 		return err
