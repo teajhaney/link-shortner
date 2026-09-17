@@ -16,7 +16,6 @@ var (
 	ErrPasswordTooLong    = errors.New("password must be at most 72 characters")
 	ErrNoUpdateFields     = errors.New("provide at least one field to update")
 	ErrInvalidCredentials = errors.New("invalid email or password")
-	ErrUserNotFound       = errors.New("user not found")
 	ErrInvalidID          = errors.New("invalid user ID")
 )
 

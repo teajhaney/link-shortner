@@ -65,12 +65,9 @@ func (s *Service) Shorten(rawURL string) (*ShortenResult, error) {
 }
 
 func (s *Service) Resolve(code string) (*database.URLRecord, error) {
-	record, err := s.database.Get(code)
-	if err != nil {
-		return nil, err
-	}
-	_ = s.database.IncrementClicks(code)
-	return record, nil
+	// The store records the click atomically, so a failing analytics write is
+	// surfaced instead of being silently dropped.
+	return s.database.GetAndIncrement(code)
 }
 
 func (s *Service) Stats(code string) (*database.URLRecord, error) {

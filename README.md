@@ -20,23 +20,32 @@ The application loads `.env` automatically. Do not commit this file because it c
 
 ## Database Setup
 
-Apply the initial schema:
+Migrations run automatically when the API starts. The SQL files in
+`internal/migrations` are embedded into the binary, and on startup the API
+applies any file that is not already recorded in the `schema_migrations` table.
+Each file runs in its own transaction, so a failed migration leaves the schema
+unchanged and nothing is recorded as applied.
 
-```bash
-psql "$DATABASE_URL" \
-  -v ON_ERROR_STOP=1 \
-  -f internal/migrations/0001_init.sql
+To add a schema change, create the next numbered file in
+`internal/migrations` and restart the API:
+
+```
+internal/migrations/0003_add_expiration.sql
 ```
 
-For future schema changes, create the next numbered migration in `internal/migrations`, then apply it explicitly:
+No `psql` step is needed, and there is no separate migration command to run in
+CI or on deploy.
 
-```bash
-psql "$DATABASE_URL" \
-  -v ON_ERROR_STOP=1 \
-  -f internal/migrations/0002_add_expiration.sql
-```
+Each file is idempotent (`CREATE TABLE IF NOT EXISTS`), so the runner is
+safe against a database that was set up by hand before migrations were
+automatic: it reconciles the schema and records both files as applied.
 
-The application does not run migrations automatically.
+### Required privileges
+
+The role in `DATABASE_URL` needs DDL privileges, not just DML, because
+migrations run as the API starts. `0002_add_users.sql` calls
+`CREATE EXTENSION pgcrypto`, so the role also needs to create that extension.
+On Neon, grant the role `CREATE` on the schema it migrates.
 
 ## Run the API
 

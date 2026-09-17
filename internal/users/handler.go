@@ -56,12 +56,7 @@ func (h *Handler) HandleSignup(w http.ResponseWriter, r *http.Request) {
 
 	err := h.service.CreateUser(req.Name, req.Email, req.Password)
 	if err != nil {
-		switch err {
-		case ErrMissingName, ErrNameTooLong, ErrInvalidEmail, ErrPasswordTooShort, ErrPasswordTooLong:
-			response.WriteError(w, http.StatusBadRequest, err.Error())
-		default:
-			response.WriteError(w, http.StatusInternalServerError, "Failed to create user")
-		}
+		handleUserError(w, err, "Failed to create user")
 		return
 	}
 
@@ -82,12 +77,7 @@ func (h *Handler) HandleGetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	}
 	user, err := h.service.GetUserByEmail(email)
 	if err != nil {
-		switch err {
-		case ErrInvalidEmail:
-			response.WriteError(w, http.StatusBadRequest, err.Error())
-		default:
-			response.WriteError(w, http.StatusInternalServerError, "Failed to retrieve user")
-		}
+		handleUserError(w, err, "Failed to retrieve user")
 		return
 	}
 
@@ -109,12 +99,7 @@ func (h *Handler) HandleGetUserByID(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.service.GetUserByID(id)
 	if err != nil {
-		switch err {
-		case ErrInvalidID:
-			response.WriteError(w, http.StatusBadRequest, err.Error())
-		default:
-			response.WriteError(w, http.StatusInternalServerError, "Failed to retrieve user")
-		}
+		handleUserError(w, err, "Failed to retrieve user")
 		return
 	}
 
@@ -149,7 +134,7 @@ func (h *Handler) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.service.UpdateUser(r.PathValue("id"), req.Name, req.Email, req.Password)
 	if err != nil {
-		handleUserMutationError(w, err, "Failed to update user")
+		handleUserError(w, err, "Failed to update user")
 		return
 	}
 
@@ -162,7 +147,7 @@ func (h *Handler) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.DeleteUser(r.PathValue("id")); err != nil {
-		handleUserMutationError(w, err, "Failed to delete user")
+		handleUserError(w, err, "Failed to delete user")
 		return
 	}
 
@@ -172,7 +157,11 @@ func (h *Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func handleUserMutationError(w http.ResponseWriter, err error, fallback string) {
+// handleUserError maps the service's sentinel errors onto HTTP status codes.
+// Validation failures are client errors (400), duplicate emails are conflicts
+// (409), and a missing user is a not found (404); anything else is an internal
+// error and the caller supplies a non-leaking fallback message.
+func handleUserError(w http.ResponseWriter, err error, fallback string) {
 	switch {
 	case errors.Is(err, ErrMissingName),
 		errors.Is(err, ErrNameTooLong),

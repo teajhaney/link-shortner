@@ -13,7 +13,6 @@ var (
 	ErrPasswordTooShort = auth.ErrPasswordTooShort
 	ErrPasswordTooLong  = auth.ErrPasswordTooLong
 	ErrInvalidID        = auth.ErrInvalidID
-	ErrUserNotFound     = auth.ErrUserNotFound
 	ErrNoUpdateFields   = auth.ErrNoUpdateFields
 )
 
@@ -59,6 +58,13 @@ func (s *service) CreateUser(name, email, password string) error {
 }
 
 func (s *service) GetUserByEmail(email string) (*UserResult, error) {
+	// Normalizing here keeps lookups consistent with the email stored on
+	// signup, which is lowercased and trimmed.
+	email, err := auth.ValidateEmail(email)
+	if err != nil {
+		return nil, err
+	}
+
 	rec, err := s.database.GetUserByEmail(email)
 	if err != nil {
 		return nil, err
@@ -74,18 +80,19 @@ func (s *service) GetUserByEmail(email string) (*UserResult, error) {
 }
 
 func (s *service) GetUserByID(id string) (*UserResult, error) {
+	// Validating the ID here avoids sending malformed UUIDs to Postgres, where
+	// they would surface as an internal error instead of a bad request.
+	id, err := auth.ValidateUserID(id)
+	if err != nil {
+		return nil, err
+	}
+
 	rec, err := s.database.GetUserByID(id)
 	if err != nil {
 		return nil, err
 	}
 
-	return &UserResult{
-		ID:        rec.ID,
-		Name:      rec.Name,
-		Email:     rec.Email,
-		CreatedAt: rec.CreatedAt.Format(time.RFC3339),
-		UpdatedAt: rec.UpdatedAt.Format(time.RFC3339),
-	}, nil
+	return toUserResult(rec), nil
 }
 
 func (s *service) GetAllUsers() ([]*UserResult, error) {

@@ -26,7 +26,9 @@ type URLRecord struct {
 type Link interface {
 	Save(rec *URLRecord) error
 	Get(code string) (*URLRecord, error)
-	IncrementClicks(code string) error
+	// GetAndIncrement resolves a code while recording exactly one click. It
+	// returns the updated record, or ErrNotFound when the code is unknown.
+	GetAndIncrement(code string) (*URLRecord, error)
 }
 
 // records for user
