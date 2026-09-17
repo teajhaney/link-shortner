@@ -4,6 +4,7 @@ import (
 	"context"
 	"link-shortner/internal/database"
 	"link-shortner/internal/link"
+	"link-shortner/internal/users"
 	"link-shortner/internal/server"
 	"log"
 	"net/http"
@@ -32,9 +33,13 @@ func main() {
 	linkService := link.NewService("http://localhost:8080", pg)
 	linkHandler := link.NewHandler(linkService)
 
+	userService := users.NewService(pg)
+	userHandler := users.NewHandler(userService)
+
 	//routes
 	router := server.New(
 		linkHandler,
+		userHandler,
 	)
 
 	log.Println("listening on :8080")

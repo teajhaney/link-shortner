@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"link-shortner/internal/database"
+	"link-shortner/internal/response"
 	"net/http"
 )
 
@@ -13,16 +14,6 @@ type Handler struct {
 
 func NewHandler(linkService *Service) *Handler {
 	return &Handler{service: linkService}
-}
-
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
-}
-
-func writeError(w http.ResponseWriter, status int, msg string) {
-	writeJSON(w, status, map[string]string{"error": msg})
 }
 
 type shortenRequest struct {
@@ -38,21 +29,21 @@ type shortenResponse struct {
 func (h *Handler) HandleShorten(w http.ResponseWriter, r *http.Request) {
 	var req shortenRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "Invalid request body")
+		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	result, err := h.service.Shorten(req.URL)
 	if err != nil {
 		if errors.Is(err, ErrMissingURL) || errors.Is(err, ErrInvalidURL) {
-			writeError(w, http.StatusBadRequest, err.Error())
+			response.WriteError(w, http.StatusBadRequest, err.Error())
 		} else {
-			writeError(w, http.StatusInternalServerError, "Failed to save URL record")
+			response.WriteError(w, http.StatusInternalServerError, "Failed to save URL record")
 		}
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, shortenResponse{
+	response.WriteJSON(w, http.StatusCreated, shortenResponse{
 		ShortURL: result.ShortURL,
 		Code:     result.Code,
 		LongURL:  result.LongURL,
@@ -65,10 +56,10 @@ func (h *Handler) HandleRedirect(w http.ResponseWriter, r *http.Request) {
 	rec, err := h.service.Resolve(code)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			writeError(w, http.StatusNotFound, "short link not found")
+			response.WriteError(w, http.StatusNotFound, "short link not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "lookup failed")
+		response.WriteError(w, http.StatusInternalServerError, "lookup failed")
 		return
 	}
 
@@ -81,12 +72,12 @@ func (h *Handler) HandleStats(w http.ResponseWriter, r *http.Request) {
 	rec, err := h.service.Stats(code)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			writeError(w, http.StatusNotFound, "short link not found")
+			response.WriteError(w, http.StatusNotFound, "short link not found")
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "lookup failed")
+		response.WriteError(w, http.StatusInternalServerError, "lookup failed")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, rec)
+	response.WriteJSON(w, http.StatusOK, rec)
 }
