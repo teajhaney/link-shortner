@@ -11,10 +11,18 @@ import (
 
 type Handler struct {
 	service *Service
+	// protect wraps the routes that must only be reachable by an
+	// authenticated caller. Injecting it keeps this package from depending on
+	// how tokens happen to be verified.
+	protect func(http.Handler) http.Handler
 }
 
-func NewHandler(userService *Service) *Handler {
-	return &Handler{service: userService}
+// NewHandler builds the users HTTP handler. protect is applied to the routes
+// that expose or mutate data about other users: pass auth.Middleware in
+// production, and an identity wrapper in tests that are exercising the
+// handlers themselves.
+func NewHandler(userService *Service, protect func(http.Handler) http.Handler) *Handler {
+	return &Handler{service: userService, protect: protect}
 }
 
 type signupRequest struct {

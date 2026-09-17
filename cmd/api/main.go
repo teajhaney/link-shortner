@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"link-shortner/internal/auth"
 	"link-shortner/internal/database"
 	"link-shortner/internal/link"
 	"link-shortner/internal/migrations"
@@ -25,6 +26,19 @@ func main() {
 		log.Fatal("DATABASE_URL is not set; export it before starting the API")
 	}
 
+	// JWT_SECRET signs access tokens. It must be at least 32 bytes and must be
+	// the same value on every instance, or tokens issued by one stop working
+	// on the others. Never commit it; keep it in .env or the environment.
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET is not set; generate one with `openssl rand -base64 32`")
+	}
+
+	jwtIssuer := os.Getenv("JWT_ISSUER")
+	if jwtIssuer == "" {
+		jwtIssuer = "link-shortner"
+	}
+
 	ctx := context.Background()
 
 	pg, err := database.NewPostgres(ctx, dsn)
@@ -38,14 +52,33 @@ func main() {
 	}
 
 	log.Println("Using postgres store")
+
+	// The JWT service is shared by the signin handler and the auth middleware,
+	// so both halves agree on the same signing key and issuer.
+	tokenService, err := auth.NewJWTService(jwtSecret, jwtIssuer)
+	if err != nil {
+		log.Fatalf("initializing jwt service: %v", err)
+	}
+
+	// The validator adds the revocation check on top of signing, so a token
+	// that logout revoked stops being accepted instead of staying usable until
+	// it expires.
+	validator := auth.NewTokenValidator(tokenService, pg)
+	refreshService := auth.NewRefreshService(tokenService, pg)
+	signinService := auth.NewSigninService(pg, tokenService, refreshService)
+	authHandler := auth.NewHandler(signinService, refreshService, validator)
+
 	linkService := link.NewService("http://localhost:8080", pg)
 	linkHandler := link.NewHandler(linkService)
 
+	// The users package owns its route list, so the middleware is injected
+	// here and applied there rather than the patterns being registered twice.
 	userService := users.NewService(pg)
-	userHandler := users.NewHandler(userService)
+	userHandler := users.NewHandler(userService, auth.Middleware(validator))
 
 	//routes
 	router := server.New(
+		authHandler,
 		linkHandler,
 		userHandler,
 	)

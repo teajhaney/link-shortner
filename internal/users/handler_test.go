@@ -55,9 +55,15 @@ func (s *errorStore) DeleteUser(string) error { return s.deleteErr }
 
 func newTestMux(store database.Users) *http.ServeMux {
 	mux := http.NewServeMux()
-	NewHandler(NewService(store)).RegisterRoutes(mux)
+	// These tests exercise the handlers, not the auth middleware, so the
+	// protected routes are mounted with an identity wrapper.
+	NewHandler(NewService(store), openRoutes).RegisterRoutes(mux)
 	return mux
 }
+
+// openRoutes is the identity middleware: it lets a test reach a protected
+// handler without a token.
+func openRoutes(next http.Handler) http.Handler { return next }
 
 func do(t *testing.T, mux *http.ServeMux, method, target, body string) *httptest.ResponseRecorder {
 	t.Helper()
@@ -173,5 +179,40 @@ func TestUnexpectedStoreErrorHidesDetails(t *testing.T) {
 	}
 	if msg := errorMessage(t, rec); msg != "Failed to retrieve user" {
 		t.Fatalf("error = %q, want %q", msg, "Failed to retrieve user")
+	}
+}
+
+// TestProtectedRoutesAreWrappedByMiddleware pins the wiring: the routes that
+// expose or change another user's data must go through the injected middleware,
+// while the public ones must not.
+func TestProtectedRoutesAreWrappedByMiddleware(t *testing.T) {
+	deny := func(http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+		})
+	}
+
+	store := &errorStore{record: &database.UserRecord{ID: testUserID, Email: "ada@example.com"}}
+	mux := http.NewServeMux()
+	NewHandler(NewService(store), deny).RegisterRoutes(mux)
+
+	protected := []struct {
+		method string
+		target string
+	}{
+		{http.MethodPatch, "/api/user/" + testUserID},
+		{http.MethodDelete, "/api/user/" + testUserID},
+		{http.MethodGet, "/api/users"},
+	}
+
+	for _, route := range protected {
+		rec := do(t, mux, route.method, route.target, "")
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("%s %s status = %d, want %d", route.method, route.target, rec.Code, http.StatusUnauthorized)
+		}
+	}
+
+	if rec := do(t, mux, http.MethodGet, "/api/user?email=ada@example.com", ""); rec.Code != http.StatusOK {
+		t.Fatalf("public GET /api/user status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }
