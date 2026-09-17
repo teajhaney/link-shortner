@@ -1,7 +1,30 @@
+# Secrets and local configuration.
+# .env holds the Neon connection string, so it must never be committed. The
+# wildcard keeps local overrides (.env.local, ...) out while still allowing a
+# committed .env.example template.
 .env
+.env.*
+!.env.example
+
+# Air live-reload build output (tmp_dir in .air.toml). Left unanchored so the
+# stale cmd/api/tmp/ directory from the earlier Air config is ignored too.
 tmp/
 
-# Compiled binaries. Air builds into tmp/main; "/api" is anchored to the repo
-# root so it never matches the cmd/api package directory.
+# Compiled binaries. Anchored to the repo root so this can never match the
+# cmd/api package directory.
 /api
+
+# Go build and test artifacts.
+*.exe
+*.test
+*.out
+
+# Go workspace files only describe a local checkout.
+go.work
+go.work.sum
+
+# macOS and editor clutter.
+.DS_Store
+.idea/
+.vscode/
 
