@@ -363,17 +363,19 @@ func TestAccessTokenLifetimeIsShorterThanRefreshToken(t *testing.T) {
 // must not be the token itself.
 func TestHashRefreshTokenIsStableAndOneWay(t *testing.T) {
 	const token = "some-refresh-token"
+	firstHash := HashRefreshToken(token)
+	secondHash := HashRefreshToken(token)
 
-	if HashRefreshToken(token) != HashRefreshToken(token) {
+	if firstHash != secondHash {
 		t.Fatal("HashRefreshToken() is not deterministic")
 	}
-	if HashRefreshToken(token) == token {
+	if firstHash == token {
 		t.Fatal("HashRefreshToken() returned the token unchanged")
 	}
-	if got := len(HashRefreshToken(token)); got != 64 {
+	if got := len(firstHash); got != 64 {
 		t.Fatalf("hash length = %d, want 64 hex characters", got)
 	}
-	if HashRefreshToken(token) == HashRefreshToken(token+"x") {
+	if firstHash == HashRefreshToken(token+"x") {
 		t.Fatal("different tokens produced the same hash")
 	}
 }
