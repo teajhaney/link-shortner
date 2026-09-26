@@ -221,13 +221,15 @@ func TestProtectedRoutesAreWrappedByMiddleware(t *testing.T) {
 	mux := http.NewServeMux()
 	NewHandler(NewService(store), deny).RegisterRoutes(mux)
 
+	// GET /api/users is intentionally disabled (see RegisterRoutes), so it is
+	// not in the protected list; re-add it here if the route returns behind a
+	// role check.
 	protected := []struct {
 		method string
 		target string
 	}{
 		{http.MethodPatch, "/api/user/" + testUserID},
 		{http.MethodDelete, "/api/user/" + testUserID},
-		{http.MethodGet, "/api/users"},
 		{http.MethodGet, "/api/user?email=ada@example.com"},
 		{http.MethodGet, "/api/user/" + testUserID},
 	}

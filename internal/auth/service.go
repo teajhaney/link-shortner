@@ -28,6 +28,11 @@ func NewSigninService(users database.Users, tokens *jwtService, refresh *Refresh
 //
 // It deliberately returns the same error for a missing email and a wrong
 // password: telling them apart leaks which emails are registered.
+//
+// The email lookup here goes to the database store, not the users HTTP route,
+// so the self-only protection on GET /api/user does not affect sign-in: this
+// runs before any token exists, exactly the one place a user must be fetched
+// without authentication.
 func (s *SigninService) Signin(email, password string) (*Session, error) {
 	// Normalizing here keeps the lookup consistent with the email stored on
 	// signup, which is lowercased and trimmed.

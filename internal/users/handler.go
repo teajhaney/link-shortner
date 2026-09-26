@@ -72,6 +72,11 @@ func (h *Handler) HandleSignup(w http.ResponseWriter, r *http.Request) {
 }
 
 // get user by email
+//
+// Self-only lookup: an authenticated caller may look up their own record but
+// nobody else's. This route is safe to lock down because sign-in does not use
+// it — auth.SigninService fetches the user straight from the database store,
+// before any token exists to protect a request with.
 func (h *Handler) HandleGetUserByEmail(w http.ResponseWriter, r *http.Request) {
 	email := r.URL.Query().Get("email")
 
@@ -127,19 +132,19 @@ func (h *Handler) HandleGetUserByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get all users
-func (h *Handler) HandleGetAllUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := h.service.GetAllUsers()
-	if err != nil {
-		response.WriteError(w, http.StatusInternalServerError, "Failed to retrieve users")
-		return
-	}
+// func (h *Handler) HandleGetAllUsers(w http.ResponseWriter, r *http.Request) {
+// 	users, err := h.service.GetAllUsers()
+// 	if err != nil {
+// 		response.WriteError(w, http.StatusInternalServerError, "Failed to retrieve users")
+// 		return
+// 	}
 
-	response.WriteJSON(w, http.StatusOK, usersResponse{
-		Code:    http.StatusOK,
-		Message: "Users retrieved successfully",
-		Data:    users,
-	})
-}
+// 	response.WriteJSON(w, http.StatusOK, usersResponse{
+// 		Code:    http.StatusOK,
+// 		Message: "Users retrieved successfully",
+// 		Data:    users,
+// 	})
+// }
 
 func (h *Handler) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
