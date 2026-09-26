@@ -79,7 +79,10 @@ func main() {
 	authHandler := auth.NewHandler(signinService, refreshService, validator)
 
 	linkService := link.NewService(publicBaseURL, pg)
-	linkHandler := link.NewHandler(linkService)
+	// The link routes that create or expose a user's links are owner-only, so
+	// they get the same auth middleware as the users routes; the redirect
+	// stays public inside the link package.
+	linkHandler := link.NewHandler(linkService, auth.Middleware(validator))
 
 	// The users package owns its route list, so the middleware is injected
 	// here and applied there rather than the patterns being registered twice.

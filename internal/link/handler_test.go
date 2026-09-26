@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"link-shortner/internal/auth"
 	"link-shortner/internal/database"
 	"net/http"
 	"net/http/httptest"
@@ -11,9 +12,34 @@ import (
 	"testing"
 )
 
+// staticVerifier stands in for the real token verifier: it accepts any bearer
+// token and reports a fixed user, so tests choose who is calling without
+// signing JWTs.
+type staticVerifier struct {
+	userID string
+}
+
+func (v *staticVerifier) Verify(string) (*auth.Claims, error) {
+	return &auth.Claims{UserID: v.userID}, nil
+}
+
+// denyAll stands in for the real middleware when a test must prove a route is
+// wrapped: it rejects every request before the handler runs.
+func denyAll(http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+	})
+}
+
+// newTestMux wires the routes with testUserID as the caller.
 func newTestMux(store database.Link) *http.ServeMux {
+	return newTestMuxWithUser(store, testUserID)
+}
+
+// newTestMuxWithUser wires the routes with an arbitrary caller.
+func newTestMuxWithUser(store database.Link, userID string) *http.ServeMux {
 	mux := http.NewServeMux()
-	NewHandler(NewService("http://localhost:8080", store)).RegisterRoutes(mux)
+	NewHandler(NewService("http://localhost:8080", store), auth.Middleware(&staticVerifier{userID: userID})).RegisterRoutes(mux)
 	return mux
 }
 
@@ -25,8 +51,12 @@ func do(t *testing.T, mux *http.ServeMux, method, target, body string) *httptest
 		reader = strings.NewReader(body)
 	}
 
+	req := httptest.NewRequest(method, target, reader)
+	// Every request carries a bearer token; the injected verifier decides
+	// which user it belongs to, and the public routes ignore it.
+	req.Header.Set("Authorization", "Bearer test-token")
 	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, httptest.NewRequest(method, target, reader))
+	mux.ServeHTTP(rec, req)
 	return rec
 }
 
@@ -37,6 +67,11 @@ func TestShortenRouteCreatesLink(t *testing.T) {
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("status = %d, want %d (body %q)", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	// The saved record must carry the caller as its owner.
+	if len(store.saved) != 1 || store.saved[0].UserID != testUserID {
+		t.Fatalf("saved owner = %+v, want %q", store.saved, testUserID)
 	}
 
 	var body struct {
@@ -52,6 +87,35 @@ func TestShortenRouteCreatesLink(t *testing.T) {
 	}
 	if body.Code == "" || body.ShortURL != "http://localhost:8080/"+body.Code {
 		t.Fatalf("code/short_url mismatch: %#v", body)
+	}
+}
+
+// TestProtectedLinkRoutesAreWrappedByMiddleware pins the wiring: shorten,
+// listing, and stats must all go through the injected middleware, or an
+// unauthenticated caller could create links and read other users' data.
+func TestProtectedLinkRoutesAreWrappedByMiddleware(t *testing.T) {
+	store := &fakeLinkStore{}
+	mux := http.NewServeMux()
+	NewHandler(NewService("http://localhost:8080", store), denyAll).RegisterRoutes(mux)
+
+	protected := []struct {
+		method string
+		target string
+		body   string
+	}{
+		{http.MethodPost, "/api/shorten", `{"url":"https://example.com"}`},
+		{http.MethodGet, "/api/links", ""},
+		{http.MethodGet, "/api/stats/abcd1234", ""},
+	}
+
+	for _, route := range protected {
+		rec := do(t, mux, route.method, route.target, route.body)
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("%s %s status = %d, want %d", route.method, route.target, rec.Code, http.StatusUnauthorized)
+		}
+	}
+	if store.saveCalls != 0 {
+		t.Fatalf("save attempts = %d, want 0", store.saveCalls)
 	}
 }
 
@@ -96,11 +160,11 @@ func TestShortenRouteHidesStoreFailure(t *testing.T) {
 func TestRedirectRecordsClick(t *testing.T) {
 	store := &fakeLinkStore{}
 	service := NewService("http://localhost:8080", store)
-	if _, err := service.Shorten("https://example.com/target"); err != nil {
+	if _, err := service.Shorten(testUserID, "https://example.com/target"); err != nil {
 		t.Fatalf("Shorten() error = %v", err)
 	}
 	mux := http.NewServeMux()
-	NewHandler(service).RegisterRoutes(mux)
+	NewHandler(service, auth.Middleware(&staticVerifier{userID: testUserID})).RegisterRoutes(mux)
 
 	rec := do(t, mux, http.MethodGet, "/"+store.saved[0].Code, "")
 
@@ -134,12 +198,12 @@ func TestRedirectUnknownCodeIsNotFound(t *testing.T) {
 func TestStatsRouteDoesNotCountClicks(t *testing.T) {
 	store := &fakeLinkStore{}
 	service := NewService("http://localhost:8080", store)
-	result, err := service.Shorten("https://example.com/target")
+	result, err := service.Shorten(testUserID, "https://example.com/target")
 	if err != nil {
 		t.Fatalf("Shorten() error = %v", err)
 	}
 	mux := http.NewServeMux()
-	NewHandler(service).RegisterRoutes(mux)
+	NewHandler(service, auth.Middleware(&staticVerifier{userID: testUserID})).RegisterRoutes(mux)
 
 	rec := do(t, mux, http.MethodGet, "/api/stats/"+result.Code, "")
 

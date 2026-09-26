@@ -15,7 +15,11 @@ var (
 
 // records for everything tracked by the system for a given shortlinked
 type URLRecord struct {
-	Code      string
+	Code string
+	// UserID is the owner: the authenticated user who shortened the URL.
+	// Every record the service writes carries it; rows that predate
+	// accounts have a NULL owner in the database.
+	UserID    string
 	LongURL   string
 	CreatedAt time.Time
 	Clicks    int64
@@ -30,6 +34,10 @@ type Link interface {
 	// GetAndIncrement resolves a code while recording exactly one click. It
 	// returns the updated record, or ErrNotFound when the code is unknown.
 	GetAndIncrement(code string) (*URLRecord, error)
+	// GetByUser returns every link the given user has shortened, newest
+	// first. It never returns rows owned by anybody else (or ownerless
+	// legacy rows), so it is safe to expose straight to that user.
+	GetByUser(userID string) ([]URLRecord, error)
 }
 
 // records for user

@@ -24,11 +24,11 @@ type Service struct {
 // UserResult is the safe user data returned to handlers and clients.
 // It intentionally excludes the password and password hash.
 type UserResult struct {
-	ID        string
-	Name      string
-	Email     string
-	CreatedAt string
-	UpdatedAt string
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 func NewService(storage database.Users, refreshStores ...database.RefreshTokens) *Service {
