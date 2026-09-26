@@ -25,6 +25,25 @@ func (s *fakeRefreshStore) SaveRefreshToken(rec *database.RefreshTokenRecord) er
 	return nil
 }
 
+func (s *fakeRefreshStore) ConsumeRefreshToken(tokenHash string, revokedAt time.Time) (*database.RefreshTokenRecord, error) {
+	rec, ok := s.byHash[tokenHash]
+	if !ok {
+		return nil, database.ErrRefreshTokenNotFound
+	}
+	if rec.RevokedAt != nil {
+		return nil, database.ErrRefreshTokenNotFound
+	}
+	if !revokedAt.Before(rec.ExpiresAt) {
+		at := revokedAt
+		rec.RevokedAt = &at
+		return nil, database.ErrRefreshTokenNotFound
+	}
+	at := revokedAt
+	rec.RevokedAt = &at
+	clone := *rec
+	return &clone, nil
+}
+
 func (s *fakeRefreshStore) GetRefreshToken(tokenHash string) (*database.RefreshTokenRecord, error) {
 	rec, ok := s.byHash[tokenHash]
 	if !ok {

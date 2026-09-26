@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"net/url"
+	"time"
 
 	"link-shortner/internal/auth"
 	"link-shortner/internal/database"
@@ -39,6 +41,14 @@ func main() {
 		jwtIssuer = "link-shortner"
 	}
 
+	publicBaseURL := os.Getenv("PUBLIC_BASE_URL")
+	if publicBaseURL == "" {
+		publicBaseURL = "http://localhost:8080"
+	}
+	if parsed, err := url.ParseRequestURI(publicBaseURL); err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		log.Fatalf("PUBLIC_BASE_URL must be an absolute http(s) URL, got %q: %v", publicBaseURL, err)
+	}
+
 	ctx := context.Background()
 
 	pg, err := database.NewPostgres(ctx, dsn)
@@ -68,12 +78,12 @@ func main() {
 	signinService := auth.NewSigninService(pg, tokenService, refreshService)
 	authHandler := auth.NewHandler(signinService, refreshService, validator)
 
-	linkService := link.NewService("http://localhost:8080", pg)
+	linkService := link.NewService(publicBaseURL, pg)
 	linkHandler := link.NewHandler(linkService)
 
 	// The users package owns its route list, so the middleware is injected
 	// here and applied there rather than the patterns being registered twice.
-	userService := users.NewService(pg)
+	userService := users.NewService(pg, pg)
 	userHandler := users.NewHandler(userService, auth.Middleware(validator))
 
 	//routes
@@ -83,8 +93,17 @@ func main() {
 		userHandler,
 	)
 
+	server := &http.Server{
+		Addr:              ":8080",
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       30 * time.Second,
+	}
+
 	log.Println("listening on :8080")
-	if err := http.ListenAndServe(":8080", router); err != nil {
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }

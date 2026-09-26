@@ -4,8 +4,8 @@ import "net/http"
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/user/create", h.HandleSignup)
-	mux.HandleFunc("GET /api/user", h.HandleGetUserByEmail)
-	mux.HandleFunc("GET /api/user/{id}", h.HandleGetUserByID)
+	mux.Handle("GET /api/user", h.protect(http.HandlerFunc(h.HandleGetUserByEmail)))
+	mux.Handle("GET /api/user/{id}", h.protect(http.HandlerFunc(h.HandleGetUserByID)))
 
 	// The routes below expose or change data about a user other than the
 	// caller, so they require an authenticated request. Registering the

@@ -85,6 +85,10 @@ type RefreshTokenRecord struct {
 // user.
 type RefreshTokens interface {
 	SaveRefreshToken(rec *RefreshTokenRecord) error
+	// ConsumeRefreshToken atomically claims a single unexpired, unrevoked token.
+	// A not-found result means the token was never issued, was already used,
+	// or was expired/revoked and has been retired.
+	ConsumeRefreshToken(tokenHash string, revokedAt time.Time) (*RefreshTokenRecord, error)
 	// GetRefreshToken returns revoked and expired tokens too: the caller has
 	// to tell "never issued" apart from "replayed".
 	GetRefreshToken(tokenHash string) (*RefreshTokenRecord, error)

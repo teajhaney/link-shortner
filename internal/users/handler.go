@@ -88,6 +88,10 @@ func (h *Handler) HandleGetUserByEmail(w http.ResponseWriter, r *http.Request) {
 		handleUserError(w, err, "Failed to retrieve user")
 		return
 	}
+	if requesterID := auth.UserIDFromContext(r.Context()); requesterID != user.ID {
+		response.WriteError(w, http.StatusForbidden, "forbidden")
+		return
+	}
 
 	response.WriteJSON(w, http.StatusOK, userResponse{
 		Code:    http.StatusOK,
@@ -102,6 +106,10 @@ func (h *Handler) HandleGetUserByID(w http.ResponseWriter, r *http.Request) {
 
 	if id == "" {
 		response.WriteError(w, http.StatusBadRequest, "Missing id parameter")
+		return
+	}
+	if requesterID := auth.UserIDFromContext(r.Context()); requesterID != id {
+		response.WriteError(w, http.StatusForbidden, "forbidden")
 		return
 	}
 
@@ -134,13 +142,19 @@ func (h *Handler) HandleGetAllUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if requesterID := auth.UserIDFromContext(r.Context()); requesterID != id {
+		response.WriteError(w, http.StatusForbidden, "forbidden")
+		return
+	}
+
 	var req updateUserRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		response.WriteError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	user, err := h.service.UpdateUser(r.PathValue("id"), req.Name, req.Email, req.Password)
+	user, err := h.service.UpdateUser(id, req.Name, req.Email, req.Password)
 	if err != nil {
 		handleUserError(w, err, "Failed to update user")
 		return
@@ -154,7 +168,12 @@ func (h *Handler) HandleUpdateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
-	if err := h.service.DeleteUser(r.PathValue("id")); err != nil {
+	id := r.PathValue("id")
+	if requesterID := auth.UserIDFromContext(r.Context()); requesterID != id {
+		response.WriteError(w, http.StatusForbidden, "forbidden")
+		return
+	}
+	if err := h.service.DeleteUser(id); err != nil {
 		handleUserError(w, err, "Failed to delete user")
 		return
 	}

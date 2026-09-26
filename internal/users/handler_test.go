@@ -3,6 +3,7 @@ package users
 import (
 	"encoding/json"
 	"io"
+	"link-shortner/internal/auth"
 	"link-shortner/internal/database"
 	"net/http"
 	"net/http/httptest"
@@ -22,6 +23,14 @@ type errorStore struct {
 	record    *database.UserRecord
 	seenEmail string
 	seenID    string
+}
+
+type staticVerifier struct {
+	userID string
+}
+
+func (v *staticVerifier) Verify(string) (*auth.Claims, error) {
+	return &auth.Claims{UserID: v.userID}, nil
 }
 
 func (s *errorStore) CreateUser(*database.UserRecord) error { return s.createErr }
@@ -53,17 +62,15 @@ func (s *errorStore) UpdateUser(string, database.UserUpdate) (*database.UserReco
 
 func (s *errorStore) DeleteUser(string) error { return s.deleteErr }
 
-func newTestMux(store database.Users) *http.ServeMux {
+func newTestMuxWithUser(store database.Users, userID string) *http.ServeMux {
 	mux := http.NewServeMux()
-	// These tests exercise the handlers, not the auth middleware, so the
-	// protected routes are mounted with an identity wrapper.
-	NewHandler(NewService(store), openRoutes).RegisterRoutes(mux)
+	NewHandler(NewService(store), auth.Middleware(&staticVerifier{userID: userID})).RegisterRoutes(mux)
 	return mux
 }
 
-// openRoutes is the identity middleware: it lets a test reach a protected
-// handler without a token.
-func openRoutes(next http.Handler) http.Handler { return next }
+func newTestMux(store database.Users) *http.ServeMux {
+	return newTestMuxWithUser(store, testUserID)
+}
 
 func do(t *testing.T, mux *http.ServeMux, method, target, body string) *httptest.ResponseRecorder {
 	t.Helper()
@@ -93,7 +100,10 @@ func errorMessage(t *testing.T, rec *httptest.ResponseRecorder) string {
 func TestGetUserByIDMapsMissingUserToNotFound(t *testing.T) {
 	store := &errorStore{getErr: database.ErrUserNotFound}
 
-	rec := do(t, newTestMux(store), http.MethodGet, "/api/user/"+testUserID, "")
+	req := httptest.NewRequest(http.MethodGet, "/api/user/"+testUserID, nil)
+	req.Header.Set("Authorization", "Bearer test-token")
+	rec := httptest.NewRecorder()
+	newTestMux(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
@@ -106,7 +116,10 @@ func TestGetUserByIDMapsMissingUserToNotFound(t *testing.T) {
 func TestGetUserByEmailMapsMissingUserToNotFound(t *testing.T) {
 	store := &errorStore{getErr: database.ErrUserNotFound}
 
-	rec := do(t, newTestMux(store), http.MethodGet, "/api/user?email=missing@example.com", "")
+	req := httptest.NewRequest(http.MethodGet, "/api/user?email=missing@example.com", nil)
+	req.Header.Set("Authorization", "Bearer test-token")
+	rec := httptest.NewRecorder()
+	newTestMux(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
@@ -116,10 +129,13 @@ func TestGetUserByEmailMapsMissingUserToNotFound(t *testing.T) {
 func TestGetUserByIDRejectsMalformedID(t *testing.T) {
 	store := &errorStore{record: &database.UserRecord{ID: testUserID}}
 
-	rec := do(t, newTestMux(store), http.MethodGet, "/api/user/not-a-uuid", "")
+	req := httptest.NewRequest(http.MethodGet, "/api/user/not-a-uuid", nil)
+	req.Header.Set("Authorization", "Bearer test-token")
+	rec := httptest.NewRecorder()
+	newTestMux(store).ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 	if store.seenID != "" {
 		t.Fatalf("malformed ID reached the store: %q", store.seenID)
@@ -129,7 +145,10 @@ func TestGetUserByIDRejectsMalformedID(t *testing.T) {
 func TestGetUserByEmailNormalizesLookup(t *testing.T) {
 	store := &errorStore{record: &database.UserRecord{ID: testUserID, Email: "ada@example.com"}}
 
-	rec := do(t, newTestMux(store), http.MethodGet, "/api/user?email=ADA@EXAMPLE.COM", "")
+	req := httptest.NewRequest(http.MethodGet, "/api/user?email=ADA@EXAMPLE.COM", nil)
+	req.Header.Set("Authorization", "Bearer test-token")
+	rec := httptest.NewRecorder()
+	newTestMux(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -162,7 +181,10 @@ func TestSignupValidationFailureIsBadRequest(t *testing.T) {
 func TestDeleteUserMissingIsNotFound(t *testing.T) {
 	store := &errorStore{deleteErr: database.ErrUserNotFound}
 
-	rec := do(t, newTestMux(store), http.MethodDelete, "/api/user/"+testUserID, "")
+	req := httptest.NewRequest(http.MethodDelete, "/api/user/"+testUserID, nil)
+	req.Header.Set("Authorization", "Bearer test-token")
+	rec := httptest.NewRecorder()
+	newTestMux(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
@@ -172,7 +194,10 @@ func TestDeleteUserMissingIsNotFound(t *testing.T) {
 func TestUnexpectedStoreErrorHidesDetails(t *testing.T) {
 	store := &errorStore{getErr: io.ErrUnexpectedEOF}
 
-	rec := do(t, newTestMux(store), http.MethodGet, "/api/user/"+testUserID, "")
+	req := httptest.NewRequest(http.MethodGet, "/api/user/"+testUserID, nil)
+	req.Header.Set("Authorization", "Bearer test-token")
+	rec := httptest.NewRecorder()
+	newTestMux(store).ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusInternalServerError)
@@ -203,6 +228,8 @@ func TestProtectedRoutesAreWrappedByMiddleware(t *testing.T) {
 		{http.MethodPatch, "/api/user/" + testUserID},
 		{http.MethodDelete, "/api/user/" + testUserID},
 		{http.MethodGet, "/api/users"},
+		{http.MethodGet, "/api/user?email=ada@example.com"},
+		{http.MethodGet, "/api/user/" + testUserID},
 	}
 
 	for _, route := range protected {
@@ -211,8 +238,19 @@ func TestProtectedRoutesAreWrappedByMiddleware(t *testing.T) {
 			t.Fatalf("%s %s status = %d, want %d", route.method, route.target, rec.Code, http.StatusUnauthorized)
 		}
 	}
+}
 
-	if rec := do(t, mux, http.MethodGet, "/api/user?email=ada@example.com", ""); rec.Code != http.StatusOK {
-		t.Fatalf("public GET /api/user status = %d, want %d", rec.Code, http.StatusOK)
+func TestGetUserByIDRejectsDifferentUser(t *testing.T) {
+	store := &errorStore{record: &database.UserRecord{ID: testUserID, Email: "ada@example.com"}}
+	mux := http.NewServeMux()
+	NewHandler(NewService(store), auth.Middleware(&staticVerifier{userID: "22222222-2222-2222-2222-222222222222"})).RegisterRoutes(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/user/"+testUserID, nil)
+	req.Header.Set("Authorization", "Bearer test-token")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
 	}
 }

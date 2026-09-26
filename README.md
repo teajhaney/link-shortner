@@ -4,7 +4,7 @@ A small Go URL shortener backed by PostgreSQL.
 
 ## Requirements
 
-- Go 1.25 or newer
+- Go 1.26 or newer
 - PostgreSQL
 - Air, optional, for live reload during development
 
@@ -14,9 +14,12 @@ Create a `.env` file in the project root:
 
 ```env
 DATABASE_URL=postgres://username:password@host:5432/database?sslmode=require
+JWT_SECRET=replace-with-a-random-32-byte-secret
+PUBLIC_BASE_URL=http://localhost:8080
+JWT_ISSUER=link-shortner
 ```
 
-The application loads `.env` automatically. Do not commit this file because it contains database credentials.
+The application loads `.env` automatically. Do not commit this file because it contains database credentials and signing secret material.
 
 ## Database Setup
 

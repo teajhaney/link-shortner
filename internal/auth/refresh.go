@@ -88,31 +88,30 @@ func (s *RefreshService) Refresh(token string) (*Session, error) {
 		return nil, ErrInvalidRefreshToken
 	}
 
-	rec, err := s.store.GetRefreshToken(HashRefreshToken(token))
+	hash := HashRefreshToken(token)
+	now := s.now()
+
+	rec, err := s.store.ConsumeRefreshToken(hash, now)
 	if err != nil {
-		// An unknown hash is deliberately indistinguishable from a token that
-		// was never issued.
 		if errors.Is(err, database.ErrRefreshTokenNotFound) {
+			existing, lookupErr := s.store.GetRefreshToken(hash)
+			if lookupErr == nil {
+				if existing.RevokedAt != nil {
+					if revokeErr := s.store.RevokeAllRefreshTokens(existing.UserID, now); revokeErr != nil {
+						return nil, revokeErr
+					}
+					return nil, ErrInvalidRefreshToken
+				}
+				if !now.Before(existing.ExpiresAt) {
+					if revokeErr := s.store.RevokeRefreshToken(existing.TokenHash, now); revokeErr != nil && !errors.Is(revokeErr, database.ErrRefreshTokenNotFound) {
+						return nil, revokeErr
+					}
+					return nil, ErrInvalidRefreshToken
+				}
+			}
 			return nil, ErrInvalidRefreshToken
 		}
 		return nil, err
-	}
-
-	now := s.now()
-
-	if rec.RevokedAt != nil {
-		if err := s.store.RevokeAllRefreshTokens(rec.UserID, now); err != nil {
-			return nil, err
-		}
-		return nil, ErrInvalidRefreshToken
-	}
-	if now.After(rec.ExpiresAt) {
-		// Expired but still on file: retire it so it stops being a candidate,
-		// then report the failure.
-		if err := s.store.RevokeRefreshToken(rec.TokenHash, now); err != nil {
-			return nil, err
-		}
-		return nil, ErrInvalidRefreshToken
 	}
 
 	access, err := s.tokens.Issue(rec.UserID)
@@ -120,12 +119,6 @@ func (s *RefreshService) Refresh(token string) (*Session, error) {
 		return nil, err
 	}
 
-	// Revoke before issuing the replacement. If the process dies in between,
-	// the client is simply logged out, which is the safe direction; the
-	// opposite order could leave two usable refresh tokens.
-	if err := s.store.RevokeRefreshToken(rec.TokenHash, now); err != nil {
-		return nil, err
-	}
 	refresh, refreshExpiresAt, err := s.Issue(rec.UserID)
 	if err != nil {
 		return nil, err

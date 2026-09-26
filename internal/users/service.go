@@ -17,7 +17,8 @@ var (
 )
 
 type Service struct {
-	database database.Users
+	database     database.Users
+	refreshStore database.RefreshTokens
 }
 
 // UserResult is the safe user data returned to handlers and clients.
@@ -30,8 +31,12 @@ type UserResult struct {
 	UpdatedAt string
 }
 
-func NewService(storage database.Users) *Service {
-	return &Service{database: storage}
+func NewService(storage database.Users, refreshStores ...database.RefreshTokens) *Service {
+	service := &Service{database: storage}
+	if len(refreshStores) > 0 {
+		service.refreshStore = refreshStores[0]
+	}
+	return service
 }
 
 func (s *Service) CreateUser(name, email, password string) error {
@@ -153,6 +158,11 @@ func (s *Service) UpdateUser(id string, name, email, password *string) (*UserRes
 	rec, err := s.database.UpdateUser(id, update)
 	if err != nil {
 		return nil, err
+	}
+	if s.refreshStore != nil && update.PasswordHash != nil {
+		if err := s.refreshStore.RevokeAllRefreshTokens(id, time.Now()); err != nil {
+			return nil, err
+		}
 	}
 	return toUserResult(rec), nil
 }

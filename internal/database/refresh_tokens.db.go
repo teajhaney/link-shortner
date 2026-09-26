@@ -24,6 +24,26 @@ func (p *Postgres) SaveRefreshToken(rec *RefreshTokenRecord) error {
 // GetRefreshToken looks a token up by hash. Revoked and expired tokens are
 // returned rather than filtered out, because the caller needs to tell "never
 // issued" apart from "already used and presented again".
+func (p *Postgres) ConsumeRefreshToken(tokenHash string, revokedAt time.Time) (*RefreshTokenRecord, error) {
+	ctx := context.Background()
+
+	var rec RefreshTokenRecord
+	err := p.pool.QueryRow(ctx,
+		`UPDATE refresh_tokens
+		 SET revoked_at = COALESCE(revoked_at, $2)
+		 WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > $2
+		 RETURNING id, user_id, token_hash, expires_at, revoked_at, created_at`,
+		tokenHash, revokedAt,
+	).Scan(&rec.ID, &rec.UserID, &rec.TokenHash, &rec.ExpiresAt, &rec.RevokedAt, &rec.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrRefreshTokenNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &rec, nil
+}
+
 func (p *Postgres) GetRefreshToken(tokenHash string) (*RefreshTokenRecord, error) {
 	ctx := context.Background()
 
